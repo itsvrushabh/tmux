@@ -197,8 +197,35 @@ tmux_conf_theme_colour_17="colour15"
 #Default tmux_conf_theme_window_status_bg="$tmux_conf_theme_colour_1"
 #Default tmux_conf_theme_window_status_attr="none"
 #Default tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
-tmux_conf_theme_window_status_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
-tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
+#First tmux_conf_theme_window_status_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
+#First tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
+
+# 1. General Status Bar Settings
+# set -g status-style "bg=default,fg=default"
+# set -g status-justify center              # This centers the window list
+
+# 2. Left Side (Empty)
+# set -g status-left ""
+
+# 3. Right Side (Time)
+# %H:%M gives 24-hour time (e.g., 15:30). Use %I:%M %p for 12-hour (03:30 PM).
+# set -g status-right " %H:%M "
+# set -g status-right-style "fg=default,bg=default"
+
+
+tmux_conf_theme_status_left_fg="default"
+tmux_conf_theme_status_left_bg="default"
+tmux_conf_theme_status_left=""
+# tmux_conf_theme_status_right=""
+# tmux_conf_theme_window_status="default"
+# tmux_conf_theme_window_status_justify="center"
+
+tmux_conf_theme_status_right_fg="default"
+tmux_conf_theme_status_right_bg="default"
+tmux_conf_theme_status_right=' %H:%M:%S |  #[fg=red],#{pane_current_command} |  #{b:pane_current_path} | 󱫋 #P | 󰊢 #(cd #{pane_current_path}; git rev-parse --abbrev-ref HEAD 2>/dev/null)'
+
+tmux_conf_theme_window_status_attr="bold"
+tmux_conf_theme_window_status_format=" #I"
 
 # window current status style
 #   - built-in variables are:
@@ -214,8 +241,13 @@ tmux_conf_theme_window_status_format="#I #W#{?#{||:#{window_bell_flag},#{window_
 #Default tmux_conf_theme_window_status_current_bg="$tmux_conf_theme_colour_4"
 #Default tmux_conf_theme_window_status_current_attr="bold"
 #Default tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
-tmux_conf_theme_window_status_current_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
-tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
+#First tmux_conf_theme_window_status_current_format="#{circled_window_index} #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,!,}#{?window_zoomed_flag,Z,}"
+#First tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#{window_zoomed_flag}}, ,}#{?window_bell_flag,🔔,}#{?window_zoomed_flag,🔍,}"
+
+tmux_conf_theme_window_status_current_fg="default"
+tmux_conf_theme_window_status_current_bg="default"
+tmux_conf_theme_window_status_current_attr="bold"
+tmux_conf_theme_window_status_current_format="#{?client_prefix,#[fg=red]●#[fg=default],●}"
 
 # window activity status style
 #Default tmux_conf_theme_window_status_activity_fg="default"
@@ -237,10 +269,10 @@ tmux_conf_theme_window_status_current_format="#I #W#{?#{||:#{window_bell_flag},#
 #Default tmux_conf_theme_left_separator_sub="|"
 #Default tmux_conf_theme_right_separator_main=""
 #Default tmux_conf_theme_right_separator_sub="|"
-tmux_conf_theme_left_separator_main='\uE0B0'  # /!\ you don't need to install Powerline
-tmux_conf_theme_left_separator_sub='\uE0B1'   #   you only need fonts patched with
-tmux_conf_theme_right_separator_main='\uE0B2' #   Powerline symbols or the standalone
-tmux_conf_theme_right_separator_sub='\uE0B3'  #   PowerlineSymbols.otf font, see README.md
+#First tmux_conf_theme_left_separator_main='\uE0B0'  # /!\ you don't need to install Powerline
+#First tmux_conf_theme_left_separator_sub='\uE0B1'   #   you only need fonts patched with
+#First tmux_conf_theme_right_separator_main='\uE0B2' #   Powerline symbols or the standalone
+#First tmux_conf_theme_right_separator_sub='\uE0B3'  #   PowerlineSymbols.otf font, see README.md
 
 # status left/right content:
 #   - separate main sections with "|"
@@ -270,8 +302,9 @@ tmux_conf_theme_right_separator_sub='\uE0B3'  #   PowerlineSymbols.otf font, see
 #     - #{username}
 #     - #{username_ssh}
 #Default tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} "
-tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} | #{pretty_pane_current_path} "
+#First tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d, #{uptime_d}d,}#{?uptime_h, #{uptime_h}h,}#{?uptime_m, #{uptime_m}m,} | #{pretty_pane_current_path} "
 #Default tmux_conf_theme_status_right=" #{prefix}#{mouse}#{pairing}#{synchronized}#{?battery_status,#{battery_status},}#{?battery_bar, #{battery_bar},}#{?battery_percentage, #{battery_percentage},} , %R , %d %b | #{username}#{root} | #{hostname} "
+
 
 # status left style
 #Default tmux_conf_theme_status_left_fg="$tmux_conf_theme_colour_6,$tmux_conf_theme_colour_7,$tmux_conf_theme_colour_8"
@@ -330,8 +363,8 @@ tmux_conf_theme_status_left=" ❐ #S | ↑#{?uptime_y, #{uptime_y}y,}#{?uptime_d
 #   - "colour_full_fg,colour_empty_fg,colour_bg"
 #   - gradient(colour_fg_1,colour_fg_2,...,colour_fg_n)
 #Default tmux_conf_battery_bar_palette="gradient"
-tmux_conf_battery_bar_palette="#d70000,#e4e4e4,#000000"   # red, white, black
-tmux_conf_battery_bar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
+#First tmux_conf_battery_bar_palette="#d70000,#e4e4e4,#000000"   # red, white, black
+#First tmux_conf_battery_bar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
 
 # battery hbar palette, possible values are:
 #   - gradient (default)
@@ -339,8 +372,8 @@ tmux_conf_battery_bar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,
 #   - "colour_low,colour_half,colour_full"
 #   - gradient(colour_fg_1,colour_fg_2,...,colour_fg_n)
 #Default tmux_conf_battery_hbar_palette="gradient"
-tmux_conf_battery_hbar_palette="#d70000,#ff5f00,#5fff00"  # red, orange, green
-tmux_conf_battery_hbar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
+#First tmux_conf_battery_hbar_palette="#d70000,#ff5f00,#5fff00"  # red, orange, green
+#First tmux_conf_battery_hbar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
 
 # battery vbar palette, possible values are:
 #   - gradient (default)
@@ -348,19 +381,19 @@ tmux_conf_battery_hbar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2
 #   - "colour_low,colour_half,colour_full"
 #   - gradient(colour_fg_1,colour_fg_2,...,colour_fg_n)
 #Default tmux_conf_battery_vbar_palette="gradient"
-tmux_conf_battery_vbar_palette="#d70000,#ff5f00,#5fff00"  # red, orange, green
-tmux_conf_battery_vbar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
+#First tmux_conf_battery_vbar_palette="#d70000,#ff5f00,#5fff00"  # red, orange, green
+#First tmux_conf_battery_vbar_palette="gradient(#00afff,#47a2ff,#7c91ff,#ac7afb,#d65be2,#e163df,#eb6cdd,#f475db,#ec9ff1,#eac3fe,#efe2ff,#ffffff)"
 
 # symbols used to indicate whether battery is charging or discharging
 #Default tmux_conf_battery_status_charging="↑"       # U+2191
 #Default tmux_conf_battery_status_discharging="↓"    # U+2193
-tmux_conf_battery_status_charging="🔌"     # U+1F50C
-tmux_conf_battery_status_discharging="🔋"  # U+1F50B
+#First tmux_conf_battery_status_charging="🔌"     # U+1F50C
+#First tmux_conf_battery_status_discharging="🔋"  # U+1F50B
 
 # clock style (when you hit <prefix> + t)
 # you may want to use %I:%M %p in place of %R in tmux_conf_theme_status_right
 #Default tmux_conf_theme_clock_colour="$tmux_conf_theme_colour_4"
-#Default tmux_conf_theme_clock_style="24"
+tmux_conf_theme_clock_style="12"
 
 
 # -- clipboard -----------------------------------------------------------------
@@ -405,12 +438,12 @@ set -g history-limit 10000
 bind c new-window -c '#{pane_current_path}' #!important
 
 # display a message after toggling mouse support
-bind m run "cut -c3- '#{TMUX_CONF}' | sh -s _toggle_mouse" \; display 'mouse #{?#{mouse},on,off}'
+#First bind m run "cut -c3- '#{TMUX_CONF}' | sh -s _toggle_mouse" \; display 'mouse #{?#{mouse},on,off}'
 
 # move status line to top
 set -g status-position top
 
-
+# set -g status-justify center #!important
 # -- tpm -----------------------------------------------------------------------
 
 # while I don't use tpm myself, many people requested official support so here
