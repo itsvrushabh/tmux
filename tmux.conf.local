@@ -451,14 +451,13 @@ set -g @plugin 'tmux-plugins/tmux-copycat'
 set -g @plugin 'tmux-plugins/tmux-cpu'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
 set -g @plugin 'tmux-plugins/tmux-continuum'
+set -g @continuum-restore 'on'
 #mm set -g @plugin 'seebi/tmux-colors-solarized'
-
 
 #dd set -g @plugin 'dracula/tmux'
 #dd set -g @dracula-show-battery false
 #dd set -g @dracula-show-powerline true
 #dd set -g @dracula-refresh-rate 10
-
 
 #pp set -g @plugin 'wfxr/tmux-power'
 # Set value to redwine, violet, forest, snow, coral, moon, everforest, gold
@@ -467,15 +466,12 @@ set -g @plugin 'tmux-plugins/tmux-continuum'
 #rr set -g @plugin 'rose-pine/tmux'
 #rr set -g @rose_pine_variant 'moon' # Options are 'main', 'moon' or 'dawn'
 
-set -g @continuum-restore 'on'
-
 #cc set -g @plugin 'catppuccin/tmux#v2.1.3'
 #cc set -g @catppuccin_flavor 'latte' # latte, frappe, macchiato or mocha
 
-set -g @plugin 'niksingh710/minimal-tmux-status'
-
+#mmm set -g @plugin 'niksingh710/minimal-tmux-status'
 # These are the default values used inside the plugin to achieve the preview shown above.
-set -g @minimal-tmux-status "top"
+#mmm set -g @minimal-tmux-status "top"
 
 # -- custom variables ----------------------------------------------------------
 
