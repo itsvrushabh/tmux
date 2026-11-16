@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+LOCK_FILE="plugins.lock.json"
+SUMMARY_FILE="plugin_updates_summary.md"
+TMUX_CONF="tmux.conf"
+
+if [ ! -f "$TMUX_CONF" ]; then
+    echo "Error: $TMUX_CONF not found." >&2
+    exit 1
+fi
+
+echo "Scanning $TMUX_CONF for plugins..."
+plugins=$(grep -E "^[[:space:]]*set -g @plugin " "$TMUX_CONF" | awk '{print $4}' | tr -d "'\"")
+
+# Load existing lockfile or initialize empty JSON
+if [ -f "$LOCK_FILE" ]; then
+    lock_data=$(cat "$LOCK_FILE")
+else
+    lock_data="{}"
+fi
+
+updated=0
+echo "## Tmux Plugin Updates Summary" > "$SUMMARY_FILE"
+echo "" >> "$SUMMARY_FILE"
+echo "| Plugin | Previous SHA | Latest SHA | Release/Tag |" >> "$SUMMARY_FILE"
+echo "| :--- | :--- | :--- | :--- |" >> "$SUMMARY_FILE"
+
+new_lock_data="$lock_data"
+
+for plugin in $plugins; do
+    echo "Checking $plugin..."
+    
+    # Fetch latest commit info via GitHub API
+    api_url="https://api.github.com/repos/${plugin}/commits/HEAD"
+    auth_header=()
+    if [ -n "${GITHUB_TOKEN:-}" ]; then
+        auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+    fi
+
+    commit_res=$(curl -sSL "${auth_header[@]}" "$api_url" || echo "{}")
+    latest_sha=$(echo "$commit_res" | jq -r '.sha // empty' 2>/dev/null || true)
+    
+    if [ -z "$latest_sha" ]; then
+        echo "Warning: Could not fetch commit info for $plugin" >&2
+        continue
+    fi
+
+    short_sha="${latest_sha:0:7}"
+
+    # Fetch latest release/tag if available
+    tag_res=$(curl -sSL "${auth_header[@]}" "https://api.github.com/repos/${plugin}/releases/latest" || echo "{}")
+    latest_tag=$(echo "$tag_res" | jq -r '.tag_name // "HEAD"' 2>/dev/null || echo "HEAD")
+
+    # Read previous recorded SHA
+    prev_sha=$(echo "$lock_data" | jq -r --arg p "$plugin" '.[$p].sha // empty' 2>/dev/null || true)
+
+    if [ -z "$prev_sha" ]; then
+        echo "Initial record for $plugin: $short_sha ($latest_tag)"
+        new_lock_data=$(echo "$new_lock_data" | jq --arg p "$plugin" --arg sha "$latest_sha" --arg tag "$latest_tag" '.[$p] = {sha: $sha, tag: $tag}')
+        echo "| [$plugin](https://github.com/$plugin) | (initial) | [\`$short_sha\`](https://github.com/$plugin/commit/$latest_sha) | $latest_tag |" >> "$SUMMARY_FILE"
+        updated=1
+    elif [ "$prev_sha" != "$latest_sha" ]; then
+        prev_short="${prev_sha:0:7}"
+        echo "Update found for $plugin: $prev_short -> $short_sha ($latest_tag)"
+        new_lock_data=$(echo "$new_lock_data" | jq --arg p "$plugin" --arg sha "$latest_sha" --arg tag "$latest_tag" '.[$p] = {sha: $sha, tag: $tag}')
+        echo "| [$plugin](https://github.com/$plugin) | [\`$prev_short\`](https://github.com/$plugin/commit/$prev_sha) | [\`$short_sha\`](https://github.com/$plugin/commit/$latest_sha) | $latest_tag |" >> "$SUMMARY_FILE"
+        updated=1
+    else
+        echo "$plugin is up to date ($short_sha)."
+    fi
+done
+
+echo "$new_lock_data" | jq '.' > "$LOCK_FILE"
+
+if [ "$updated" -eq 1 ]; then
+    echo "Updates were recorded in $LOCK_FILE."
+    cat "$SUMMARY_FILE"
+else
+    echo "All plugins are already up to date."
+    rm -f "$SUMMARY_FILE"
+fi
