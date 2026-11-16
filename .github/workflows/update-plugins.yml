@@ -1,0 +1,62 @@
+name: Auto Update Tmux Plugins
+
+on:
+  schedule:
+    # Run every Monday at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-and-update:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux jq curl
+
+      - name: Check for plugin updates
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          chmod +x scripts/check-plugin-updates.sh
+          ./scripts/check-plugin-updates.sh
+
+      - name: Validate Tmux configurations
+        run: |
+          tmux -f tmux.conf start-server \; kill-server
+          tmux -f tmux.conf.omarchy start-server \; kill-server
+
+      - name: Create Pull Request if updates available
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -n "$(git status --porcelain plugins.lock.json)" ]; then
+            BRANCH_NAME="bot/update-tmux-plugins-$(date +%Y%m%d%H%M%S)"
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git checkout -b "$BRANCH_NAME"
+            git add plugins.lock.json
+            git commit -m "chore(plugins): update tmux plugins to latest versions"
+            git push origin "$BRANCH_NAME"
+
+            SUMMARY="Automated plugin version check detected new updates for configured tmux plugins."
+            if [ -f "plugin_updates_summary.md" ]; then
+              SUMMARY=$(cat plugin_updates_summary.md)
+            fi
+
+            gh pr create \
+              --base main \
+              --head "$BRANCH_NAME" \
+              --title "chore(plugins): auto-update tmux plugins to latest versions" \
+              --body "$SUMMARY"
+          else
+            echo "No plugin updates found. Everything is up to date."
+          fi

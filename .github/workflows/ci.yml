@@ -1,0 +1,29 @@
+name: CI - Validate Configs
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y tmux jq curl bash
+
+      - name: Validate Tmux configuration syntax
+        run: |
+          tmux -f tmux.conf start-server \; kill-server
+          tmux -f tmux.conf.omarchy start-server \; kill-server
+
+      - name: Validate Bash scripts syntax
+        run: |
+          bash -n bash_theme.sh
+          bash -n scripts/check-plugin-updates.sh
