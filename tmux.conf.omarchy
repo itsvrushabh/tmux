@@ -77,9 +77,8 @@ setw -g aggressive-resize on
 set -g detach-on-destroy off
 set -g extended-keys on
 set -g extended-keys-format csi-u
-set -ag terminal-features "xterm-kitty:extkeys"
+set -as terminal-features ",xterm-kitty:extkeys"
 set -as terminal-features ",*:clipboard"
-set -sg escape-time 10
 
 # Status bar
 set -g status-position top
