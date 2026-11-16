@@ -34,38 +34,36 @@ Cyan='\[\e[0;36m\]'
 Green='\[\e[0;32m\]'
 Yellow='\[\e[0;33m\]'
 Purple='\[\e[0;35m\]'
+Red='\[\e[0;31m\]'
 
-# Function to show Git Branch
-# parse_git_branch() {
-#      git branch 2> /dev/null | sed -e '/^[^*]/d' -e 's/* \(.*\)/ (\1)/'
-# }
-
+# Function to show Git Branch and status indicators
 parse_git_branch() {
-     # Check if we are in a git repo
-     if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-          local status="$(git status --porcelain 2>/dev/null)"
-          local branch="$(git b-name 2>/dev/null || git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-          local marks=""
+     local status
+     status=$(git status --porcelain -b 2>/dev/null) || return
+     local header
+     header=$(echo "$status" | head -n1)
+     local branch="${header#\#\# }"
+     branch="${branch%%...*}"
+     local marks=""
 
-          # Check for uncommitted changes
-          if echo "$status" | grep -q '^ [MADRCU]'; then
-               marks+=" ✚" # Unstaged changes
-          fi
-          # Check for staged changes
-          if echo "$status" | grep -q '^[MADRCU]'; then
-               marks+=" ●" # Staged changes
-          fi
-          # Check for untracked files
-          if echo "$status" | grep -q '??'; then
-               marks+=" …" # Untracked files
-          fi
-          # Check if ahead of remote
-          if git status -sb 2>/dev/null | grep -q 'ahead'; then
-               marks+=" ↑" # Local is ahead
-          fi
-
-          echo -e " ($branch$marks)"
+     # Check if ahead of remote
+     if [[ "$header" =~ ahead ]]; then
+          marks+=" ↑"
      fi
+     # Check for uncommitted changes
+     if echo "$status" | grep -q '^ [MADRCU]'; then
+          marks+=" ✚" # Unstaged changes
+     fi
+     # Check for staged changes
+     if echo "$status" | grep -q '^[MADRCU]'; then
+          marks+=" ●" # Staged changes
+     fi
+     # Check for untracked files
+     if echo "$status" | grep -q '^??'; then
+          marks+=" …" # Untracked files
+     fi
+
+     echo -e " ($branch$marks)"
 }
 
 # The enhanced function (from above)
@@ -88,11 +86,11 @@ FailureIcon="✘"
 
 # Function to determine which icon to show
 prompt_status() {
-    local exit_code=$?
-    if [ $exit_code -eq 0 ]; then
-        echo -e "$Green$SuccessIcon" # Green check
+    local exit_code="${1:-$?}"
+    if [ "$exit_code" -eq 0 ]; then
+        echo -ne "$Green$SuccessIcon$Reset" # Green check
     else
-        echo -e "$Red$FailureIcon" # Red cross
+        echo -ne "$Red$FailureIcon$Reset" # Red cross
     fi
 }
 
@@ -119,7 +117,6 @@ spinner() {
 alias bashconfig="mate ~/.bashrc"
 
 export LANGUAGE=en_IN.UTF-8
-. "$HOME/.cargo/env"
 
 
 # --- 1. Zoxide (Smarter 'cd') ---
@@ -160,5 +157,5 @@ fi
 
 # export PS1="${Blue}\w${Yellow}\$(parse_git_branch)${Reset} "
 
-# Final PS1
-export PS1="$(prompt_status) ${Cyan}\w\$(parse_git_branch)${Reset} "
+# Final PS1 (prompt_status evaluates the exit status dynamically)
+export PS1="\$(prompt_status \$?) ${Cyan}\w\$(parse_git_branch)${Reset} "
