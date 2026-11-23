@@ -8,7 +8,7 @@
     "tag": "HEAD"
   },
   "christoomey/vim-tmux-navigator": {
-    "sha": "e41c431a0c7b7388ae7ba341f01a0d217eb3a432",
+    "sha": "fb217852efb294a50a10507fc8d53709696b6e23",
     "tag": "HEAD"
   },
   "tmux-plugins/tmux-resurrect": {
