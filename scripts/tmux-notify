@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/tmux-notify"
+LOG_FILE="$STATE_DIR/history.log"
+UNREAD_FILE="$STATE_DIR/unread"
+PREVIEW_ID_FILE="$STATE_DIR/preview_id"
+
+mkdir -p "$STATE_DIR"
+touch "$LOG_FILE"
+
+refresh_badge() {
+    local count="${1:-0}"
+    if (( count > 0 )); then
+        tmux set -g @notify_count "$count" 2>/dev/null || true
+    else
+        tmux set -gu @notify_count 2>/dev/null || true
+    fi
+    tmux refresh-client -S 2>/dev/null || true
+}
+
+clear_preview() {
+    tmux set -gu @notify_preview 2>/dev/null || true
+    tmux refresh-client -S 2>/dev/null || true
+}
+
+cmd_push() {
+    local msg="${*:-}"
+    [[ -z "$msg" ]] && return 0
+
+    local ts count preview_id preview_text
+    ts="$(date '+%H:%M:%S')"
+    printf '[%s] %s\n' "$ts" "$msg" >>"$LOG_FILE"
+
+    # Keep the latest 100 notifications
+    if (( $(wc -l <"$LOG_FILE") > 100 )); then
+        tail -n 100 "$LOG_FILE" >"$LOG_FILE.tmp" && mv "$LOG_FILE.tmp" "$LOG_FILE"
+    fi
+
+    count="$(cat "$UNREAD_FILE" 2>/dev/null || echo 0)"
+    count=$((count + 1))
+    printf '%s' "$count" >"$UNREAD_FILE"
+
+    # Show a brief corner preview chip next to the bell for 5 seconds
+    preview_text="${msg:0:28}"
+    if (( ${#msg} > 28 )); then
+        preview_text="${preview_text}…"
+    fi
+    # Escape # so tmux format parser prints literal text
+    preview_text="${preview_text//#/##}"
+    preview_id="$(date +%s%N)"
+    printf '%s' "$preview_id" >"$PREVIEW_ID_FILE"
+
+    tmux set -g @notify_preview ": $preview_text" 2>/dev/null || true
+    refresh_badge "$count"
+
+    nohup bash -c '
+        sleep 5
+        cur="$(cat "$1" 2>/dev/null || true)"
+        if [[ "$cur" == "$2" ]]; then
+            tmux set -gu @notify_preview 2>/dev/null || true
+            tmux refresh-client -S 2>/dev/null || true
+        fi
+    ' _ "$PREVIEW_ID_FILE" "$preview_id" >/dev/null 2>&1 </dev/null &
+}
+
+cmd_list() {
+    if [[ ! -s "$LOG_FILE" ]]; then
+        echo "(No notifications)"
+        return 0
+    fi
+    tac "$LOG_FILE"
+}
+
+cmd_clear() {
+    : >"$LOG_FILE"
+    printf '0' >"$UNREAD_FILE"
+    rm -f "$PREVIEW_ID_FILE"
+    clear_preview
+    refresh_badge 0
+}
+
+cmd_ui() {
+    printf '0' >"$UNREAD_FILE"
+    rm -f "$PREVIEW_ID_FILE"
+    clear_preview
+    refresh_badge 0
+
+    local selected msg
+    selected="$(
+        cmd_list | fzf \
+            --no-sort \
+            --layout=reverse \
+            --border=none \
+            --prompt='󰂚 ' \
+            --header='Enter: copy | Ctrl-x: clear | Esc: close' \
+            --preview='printf "%s\n" {}' \
+            --preview-window='down:4:wrap:border-top' \
+            --bind "ctrl-x:execute-silent(\"$HOME/.local/bin/tmux-notify\" clear)+reload(\"$HOME/.local/bin/tmux-notify\" list)" \
+            || true
+    )"
+
+    if [[ -n "$selected" && "$selected" != "(No notifications)" ]]; then
+        msg="${selected#\[*\] }"
+        if command -v clip.exe >/dev/null 2>&1; then
+            printf '%s' "$msg" | clip.exe || true
+        fi
+        printf '%s' "$msg" | tmux load-buffer -b notify - 2>/dev/null || true
+    fi
+}
+
+case "${1:-ui}" in
+    push)
+        shift
+        cmd_push "$*"
+        ;;
+    list)
+        cmd_list
+        ;;
+    clear)
+        cmd_clear
+        ;;
+    ui)
+        cmd_ui
+        ;;
+    *)
+        cmd_push "$*"
+        ;;
+esac

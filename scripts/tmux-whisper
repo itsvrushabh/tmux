@@ -1,0 +1,314 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODEL_DIR="${XDG_DATA_HOME:-$HOME/.local/share}/whisper"
+MODEL_NAME="${WHISPER_MODEL:-ggml-small.en.bin}"
+MODEL_PATH="$MODEL_DIR/$MODEL_NAME"
+MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$MODEL_NAME"
+
+STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/tmux-whisper"
+LOCK_FILE="$STATE_DIR/lock"
+MODEL_LOCK_FILE="$STATE_DIR/model.lock"
+PID_FILE="$STATE_DIR/pid"
+WAV_FILE="$STATE_DIR/wav"
+PANE_FILE="$STATE_DIR/pane"
+START_MS_FILE="$STATE_DIR/start_ms"
+
+mkdir -p "$STATE_DIR"
+
+set_status() {
+    tmux set -g @whisper_status "$1" 2>/dev/null || true
+    tmux refresh-client -S 2>/dev/null || true
+}
+
+notify_msg() {
+    if [[ -x "$HOME/.local/bin/tmux-notify" ]]; then
+        "$HOME/.local/bin/tmux-notify" push "$1" 2>/dev/null || true
+    fi
+}
+
+is_recording() {
+    local pid
+    [[ -f "$PID_FILE" ]] || return 1
+    pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null
+}
+
+resolve_pane() {
+    local pane="${1:-${TMUX_PANE:-}}"
+    if [[ -z "$pane" ]]; then
+        pane="$(tmux display-message -p '#{pane_id}' 2>/dev/null || true)"
+    fi
+    printf '%s' "$pane"
+}
+
+check_deps() {
+    if ! command -v arecord >/dev/null 2>&1; then
+        echo "Error: arecord not found (install alsa-utils alsa-plugins libpulse)." >&2
+        notify_msg "Whisper error: arecord not found"
+        return 1
+    fi
+    if ! command -v whisper-cli >/dev/null 2>&1; then
+        echo "Error: whisper-cli not found. Install: sudo pacman -S whisper-cpp" >&2
+        notify_msg "Install whisper-cpp: sudo pacman -S whisper-cpp"
+        return 1
+    fi
+}
+
+ensure_model_bg() {
+    if [[ -f "$MODEL_PATH" ]]; then
+        return 0
+    fi
+    exec 8>"$MODEL_LOCK_FILE"
+    if ! flock -n -x 8; then
+        exec 8>&-
+        notify_msg "Whisper model download already in progress..."
+        return 2
+    fi
+    if [[ -f "$MODEL_PATH" ]]; then
+        flock -u 8 2>/dev/null || true
+        exec 8>&-
+        return 0
+    fi
+    set_status "#[fg=yellow]● #[default]"
+    notify_msg "Downloading $MODEL_NAME..."
+    mkdir -p "$MODEL_DIR"
+    if ! curl -fsSL -o "$MODEL_PATH.part" "$MODEL_URL"; then
+        rm -f "$MODEL_PATH.part"
+        set_status ""
+        flock -u 8 2>/dev/null || true
+        exec 8>&-
+        notify_msg "Failed to download $MODEL_NAME"
+        return 1
+    fi
+    mv "$MODEL_PATH.part" "$MODEL_PATH"
+    set_status ""
+    flock -u 8 2>/dev/null || true
+    exec 8>&-
+}
+
+transcribe_and_paste() {
+    local wav="$1"
+    local target_pane="$2"
+
+    set_status "#[fg=yellow]● #[default]"
+    local raw_text text
+    raw_text="$(whisper-cli -m "$MODEL_PATH" -f "$wav" -t "$(nproc)" --no-timestamps --no-prints 2>/dev/null || true)"
+    rm -f "$wav"
+    if [[ ! -f "$PID_FILE" ]]; then
+        set_status ""
+    fi
+
+    text="$(printf '%s' "$raw_text" | tr '\n' ' ' | sed -E -e 's/\[[^]]*\]//g' -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' -e 's/  +/ /g')"
+    if [[ -z "$text" ]]; then
+        notify_msg "Whisper: No speech detected"
+        return 0
+    fi
+
+    if command -v clip.exe >/dev/null 2>&1; then
+        printf '%s' "$text" | clip.exe || true
+    fi
+
+    printf '%s' "$text" | tmux load-buffer -b whisper -
+    if [[ -n "$target_pane" ]]; then
+        tmux paste-buffer -d -p -b whisper -t "$target_pane"
+    else
+        tmux paste-buffer -d -p -b whisper
+    fi
+    notify_msg "Whisper: ${text:0:80}"
+}
+
+start_unlocked() {
+    if is_recording; then
+        return 0
+    fi
+
+    check_deps || exit 1
+
+    if [[ ! -f "$MODEL_PATH" ]]; then
+        local dl_rc=0
+        flock -u 9 2>/dev/null || true
+        exec 9>&- 2>/dev/null || true
+        ensure_model_bg || dl_rc=$?
+        if (( dl_rc == 2 )); then
+            return 0
+        elif (( dl_rc != 0 )); then
+            exit 1
+        fi
+        exec 9>"$LOCK_FILE"
+        flock -w 3 -x 9
+        if is_recording; then
+            return 0
+        fi
+    fi
+
+    local target_pane tmp_wav rec_pid
+    target_pane="$(resolve_pane "${1:-}")"
+    tmp_wav="$(mktemp --suffix=.wav)"
+
+    printf '%s' "$tmp_wav" >"$WAV_FILE"
+    printf '%s' "$target_pane" >"$PANE_FILE"
+    date +%s%3N >"$START_MS_FILE"
+
+    nohup arecord -q -f S16_LE -r 16000 -c 1 "$tmp_wav" >/dev/null 2>&1 </dev/null 9>&- 8>&- &
+    rec_pid=$!
+    printf '%s' "$rec_pid" >"$PID_FILE"
+
+    set_status "#[fg=red]● #[default]"
+}
+
+stop_unlocked() {
+    if [[ ! -f "$PID_FILE" ]]; then
+        set_status ""
+        return 0
+    fi
+
+    local rec_pid tmp_wav target_pane
+    rec_pid="$(cat "$PID_FILE" 2>/dev/null || true)"
+    tmp_wav="$(cat "$WAV_FILE" 2>/dev/null || true)"
+    target_pane="$(cat "$PANE_FILE" 2>/dev/null || true)"
+    rm -f "$PID_FILE" "$WAV_FILE" "$PANE_FILE" "$START_MS_FILE"
+
+    if [[ -z "$target_pane" ]]; then
+        target_pane="$(resolve_pane "${1:-}")"
+    fi
+
+    if [[ -n "$rec_pid" ]] && kill -0 "$rec_pid" 2>/dev/null; then
+        # Allow PulseAudio/ALSA capture buffer to flush the final words
+        sleep 0.2
+        kill -INT "$rec_pid" 2>/dev/null || true
+        for _ in $(seq 1 20); do
+            kill -0 "$rec_pid" 2>/dev/null || break
+            sleep 0.05
+        done
+    fi
+
+    if [[ -z "$tmp_wav" ]] || [[ ! -s "$tmp_wav" ]]; then
+        rm -f "$tmp_wav"
+        set_status ""
+        notify_msg "Whisper: No audio captured"
+        return 0
+    fi
+
+    STOPPED_WAV="$tmp_wav"
+    STOPPED_PANE="$target_pane"
+}
+
+cmd_start() {
+    exec 9>"$LOCK_FILE"
+    flock -w 3 -x 9
+    start_unlocked "${1:-}"
+}
+
+cmd_stop() {
+    STOPPED_WAV=""
+    STOPPED_PANE=""
+    exec 9>"$LOCK_FILE"
+    flock -w 3 -x 9
+    stop_unlocked "${1:-}"
+    flock -u 9
+    exec 9>&-
+
+    if [[ -n "$STOPPED_WAV" ]]; then
+        check_deps || { rm -f "$STOPPED_WAV"; set_status ""; exit 1; }
+        transcribe_and_paste "$STOPPED_WAV" "$STOPPED_PANE"
+    fi
+}
+
+cmd_toggle() {
+    STOPPED_WAV=""
+    STOPPED_PANE=""
+    exec 9>"$LOCK_FILE"
+    flock -w 3 -x 9
+
+    if is_recording; then
+        # Debounce key-repeat if toggle is fired again within 600ms of starting
+        local now_ms start_ms elapsed_ms
+        now_ms="$(date +%s%3N)"
+        start_ms="$(cat "$START_MS_FILE" 2>/dev/null || echo 0)"
+        elapsed_ms=$((now_ms - start_ms))
+        if (( elapsed_ms < 600 )); then
+            return 0
+        fi
+        stop_unlocked "${1:-}"
+    else
+        start_unlocked "${1:-}"
+        return 0
+    fi
+
+    flock -u 9
+    exec 9>&-
+    if [[ -n "$STOPPED_WAV" ]]; then
+        check_deps || { rm -f "$STOPPED_WAV"; set_status ""; exit 1; }
+        transcribe_and_paste "$STOPPED_WAV" "$STOPPED_PANE"
+    fi
+}
+
+cmd_popup() {
+    local target_pane tmp_wav rec_pid=""
+    target_pane="$(resolve_pane "${1:-}")"
+    tmp_wav="$(mktemp --suffix=.wav)"
+
+    cleanup_popup() {
+        if [[ -n "$rec_pid" ]] && kill -0 "$rec_pid" 2>/dev/null; then
+            kill -INT "$rec_pid" 2>/dev/null || true
+            wait "$rec_pid" 2>/dev/null || true
+        fi
+        rm -f "$tmp_wav"
+        set_status ""
+    }
+    trap cleanup_popup EXIT INT TERM
+
+    if ! check_deps; then
+        read -r -n 1 -s -p "Press any key to close..." || true
+        exit 1
+    fi
+
+    if [[ ! -f "$MODEL_PATH" ]]; then
+        echo "Downloading Whisper model ($MODEL_NAME) to $MODEL_PATH ..."
+        mkdir -p "$MODEL_DIR"
+        if ! curl -fL --progress-bar -o "$MODEL_PATH.part" "$MODEL_URL"; then
+            rm -f "$MODEL_PATH.part"
+            echo "Failed to download model."
+            read -r -n 1 -s -p "Press any key to close..." || true
+            exit 1
+        fi
+        mv "$MODEL_PATH.part" "$MODEL_PATH"
+    fi
+
+    clear
+    echo "🎤 Recording... Press [Enter] to transcribe, or [Ctrl-C] to cancel."
+    arecord -q -f S16_LE -r 16000 -c 1 "$tmp_wav" &
+    rec_pid=$!
+
+    IFS= read -r _
+    sleep 0.2
+    kill -INT "$rec_pid" 2>/dev/null || true
+    wait "$rec_pid" 2>/dev/null || true
+    rec_pid=""
+
+    echo "⏳ Transcribing..."
+    transcribe_and_paste "$tmp_wav" "$target_pane"
+}
+
+case "${1:-popup}" in
+    start)
+        shift
+        cmd_start "${1:-}"
+        ;;
+    stop)
+        shift
+        cmd_stop "${1:-}"
+        ;;
+    toggle)
+        shift
+        cmd_toggle "${1:-}"
+        ;;
+    popup)
+        shift || true
+        cmd_popup "${1:-}"
+        ;;
+    *)
+        cmd_popup "${1:-}"
+        ;;
+esac
