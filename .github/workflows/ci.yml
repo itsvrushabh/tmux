@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y tmux jq curl bash
+          sudo apt-get install -y tmux jq curl bash python3-yaml
 
       - name: Validate Tmux configuration syntax
         run: |
@@ -25,5 +25,9 @@ jobs:
 
       - name: Validate Bash scripts syntax
         run: |
-          bash -n bash_theme.sh
-          bash -n scripts/check-plugin-updates.sh
+          bash -n bash_theme.sh bashrc bash_profile
+          bash -n scripts/check-plugin-updates.sh scripts/tmux-notify scripts/tmux-whisper
+
+      - name: Validate YAML config syntax
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('config/tmux-which-key/config.yaml'))"

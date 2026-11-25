@@ -29,10 +29,11 @@ echo "| :--- | :--- | :--- | :--- |" >> "$SUMMARY_FILE"
 new_lock_data="$lock_data"
 
 for plugin in $plugins; do
+    repo="${plugin%%#*}"
     echo "Checking $plugin..."
     
     # Fetch latest commit info via GitHub API
-    api_url="https://api.github.com/repos/${plugin}/commits/HEAD"
+    api_url="https://api.github.com/repos/${repo}/commits/HEAD"
     auth_header=()
     if [ -n "${GITHUB_TOKEN:-}" ]; then
         auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
@@ -49,7 +50,7 @@ for plugin in $plugins; do
     short_sha="${latest_sha:0:7}"
 
     # Fetch latest release/tag if available
-    tag_res=$(curl -sSL "${auth_header[@]}" "https://api.github.com/repos/${plugin}/releases/latest" || echo "{}")
+    tag_res=$(curl -sSL "${auth_header[@]}" "https://api.github.com/repos/${repo}/releases/latest" || echo "{}")
     latest_tag=$(echo "$tag_res" | jq -r '.tag_name // "HEAD"' 2>/dev/null || echo "HEAD")
 
     # Read previous recorded SHA
@@ -58,16 +59,26 @@ for plugin in $plugins; do
     if [ -z "$prev_sha" ]; then
         echo "Initial record for $plugin: $short_sha ($latest_tag)"
         new_lock_data=$(echo "$new_lock_data" | jq --arg p "$plugin" --arg sha "$latest_sha" --arg tag "$latest_tag" '.[$p] = {sha: $sha, tag: $tag}')
-        echo "| [$plugin](https://github.com/$plugin) | (initial) | [\`$short_sha\`](https://github.com/$plugin/commit/$latest_sha) | $latest_tag |" >> "$SUMMARY_FILE"
+        echo "| [$plugin](https://github.com/$repo) | (initial) | [\`$short_sha\`](https://github.com/$repo/commit/$latest_sha) | $latest_tag |" >> "$SUMMARY_FILE"
         updated=1
     elif [ "$prev_sha" != "$latest_sha" ]; then
         prev_short="${prev_sha:0:7}"
         echo "Update found for $plugin: $prev_short -> $short_sha ($latest_tag)"
         new_lock_data=$(echo "$new_lock_data" | jq --arg p "$plugin" --arg sha "$latest_sha" --arg tag "$latest_tag" '.[$p] = {sha: $sha, tag: $tag}')
-        echo "| [$plugin](https://github.com/$plugin) | [\`$prev_short\`](https://github.com/$plugin/commit/$prev_sha) | [\`$short_sha\`](https://github.com/$plugin/commit/$latest_sha) | $latest_tag |" >> "$SUMMARY_FILE"
+        echo "| [$plugin](https://github.com/$repo) | [\`$prev_short\`](https://github.com/$repo/commit/$prev_sha) | [\`$short_sha\`](https://github.com/$repo/commit/$latest_sha) | $latest_tag |" >> "$SUMMARY_FILE"
         updated=1
     else
         echo "$plugin is up to date ($short_sha)."
+    fi
+done
+
+# Prune plugins removed from tmux.conf
+for existing_plugin in $(echo "$lock_data" | jq -r 'keys[]'); do
+    if ! printf '%s\n' "$plugins" | grep -Fxq "$existing_plugin"; then
+        echo "Removing unused plugin from lockfile: $existing_plugin"
+        new_lock_data=$(echo "$new_lock_data" | jq --arg p "$existing_plugin" 'del(.[$p])')
+        echo "| $existing_plugin | (removed) | - | - |" >> "$SUMMARY_FILE"
+        updated=1
     fi
 done
 

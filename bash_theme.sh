@@ -23,7 +23,7 @@ if [ -d ~/.bashrc.d ]; then
     done
 fi
 unset rc
-. "$HOME/.cargo/env"
+[ -f "$HOME/.cargo/env" ] && . "$HOME/.cargo/env"
 
 # --- Custom Bash Theme ---
 
@@ -98,7 +98,7 @@ spinner() {
     local pid=$1
     local delay=0.1
     local spinstr='|/-\'
-    while [ "$(ps a | awk '{print $1}' | grep $pid)" ]; do
+    while kill -0 "$pid" 2>/dev/null; do
         local temp=${spinstr#?}
         printf " [%c]  " "$spinstr"
         local spinstr=$temp${spinstr%"$temp"}
@@ -111,22 +111,19 @@ spinner() {
 # Usage: 
 # sleep 5 & spinner $!
 
-
-
-# Example aliases
-alias bashconfig="mate ~/.bashrc"
-
 export LANGUAGE=en_IN.UTF-8
 
 
 # --- 1. Zoxide (Smarter 'cd') ---
-eval "$(zoxide init bash)"
-alias cd="z"
-alias ci="z -i" # Interactive jump using fzf
+if command -v zoxide >/dev/null 2>&1; then
+  eval "$(zoxide init bash)"
+  alias cd="z"
+  alias ci="z -i" # Interactive jump using fzf
+fi
 
 # --- 2. Eza (Modern 'ls' replacement) ---
 # Check if eza is installed to set aliases
-if command -v eza >/dev/null; then
+if command -v eza >/dev/null 2>&1; then
   alias ls='eza --icons --group-directories-first'
   alias ll='eza -lh --icons --git --group-directories-first'
   alias la='eza -a --icons --group-directories-first'
@@ -134,25 +131,35 @@ if command -v eza >/dev/null; then
 fi
 
 # --- 3. Bat (Better 'cat') ---
-alias cat="bat"
-export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+if command -v bat >/dev/null 2>&1; then
+  alias cat="bat"
+  export MANPAGER="sh -c 'col -bx | bat -l man -p'"
+fi
 
 # --- 4. FD & FZF Integration ---
 # Use 'fd' instead of 'find' for speed and to respect .gitignore
-export FZF_DEFAULT_COMMAND='fd --type f --strip-cwd-prefix --hidden --follow --exclude .git'
-export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+if command -v fd >/dev/null 2>&1; then
+  export FZF_DEFAULT_COMMAND='fd --type f --strip-cwd-prefix --hidden --follow --exclude .git'
+  export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+fi
 
 # Setup FZF UI with Bat Preview
 # This shows a preview window on the right with syntax highlighting
-export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border \
+if command -v bat >/dev/null 2>&1; then
+  export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border \
 --preview 'bat --color=always --style=numbers --line-range :500 {}'"
+else
+  export FZF_DEFAULT_OPTS="--height 40% --layout=reverse --border"
+fi
 
 # --- 5. FZF Keybindings & Completion ---
 # Load official Arch Linux integration for Bash
-eval "$(fzf --bash)"
+command -v fzf >/dev/null 2>&1 && eval "$(fzf --bash)"
 # Auto-start tmux
-if command -v tmux &> /dev/null && [ -z "$TMUX" ]; then
-    tmux attach-session -t default || tmux new-session -s default
+if [ -z "$TMUX" ] && [ -z "$NVIM" ] && [ "$TERM_PROGRAM" != "vscode" ]; then
+    if command -v tmux >/dev/null 2>&1; then
+        exec tmux new-session -A -s default
+    fi
 fi
 
 # export PS1="${Blue}\w${Yellow}\$(parse_git_branch)${Reset} "

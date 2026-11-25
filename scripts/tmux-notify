@@ -5,6 +5,7 @@ STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/tmux-notify"
 LOG_FILE="$STATE_DIR/history.log"
 UNREAD_FILE="$STATE_DIR/unread"
 PREVIEW_ID_FILE="$STATE_DIR/preview_id"
+LOCK_FILE="$STATE_DIR/lock"
 
 mkdir -p "$STATE_DIR"
 touch "$LOG_FILE"
@@ -30,6 +31,10 @@ cmd_push() {
 
     local ts count preview_id preview_text
     ts="$(date '+%H:%M:%S')"
+
+    exec 9>"$LOCK_FILE"
+    flock -w 3 -x 9
+
     printf '[%s] %s\n' "$ts" "$msg" >>"$LOG_FILE"
 
     # Keep the latest 100 notifications
@@ -38,6 +43,7 @@ cmd_push() {
     fi
 
     count="$(cat "$UNREAD_FILE" 2>/dev/null || echo 0)"
+    [[ "$count" =~ ^[0-9]+$ ]] || count=0
     count=$((count + 1))
     printf '%s' "$count" >"$UNREAD_FILE"
 
@@ -53,6 +59,9 @@ cmd_push() {
 
     tmux set -g @notify_preview ": $preview_text" 2>/dev/null || true
     refresh_badge "$count"
+
+    flock -u 9
+    exec 9>&-
 
     nohup bash -c '
         sleep 5
@@ -73,18 +82,26 @@ cmd_list() {
 }
 
 cmd_clear() {
+    exec 9>"$LOCK_FILE"
+    flock -w 3 -x 9
     : >"$LOG_FILE"
     printf '0' >"$UNREAD_FILE"
     rm -f "$PREVIEW_ID_FILE"
     clear_preview
     refresh_badge 0
+    flock -u 9
+    exec 9>&-
 }
 
 cmd_ui() {
+    exec 9>"$LOCK_FILE"
+    flock -w 3 -x 9
     printf '0' >"$UNREAD_FILE"
     rm -f "$PREVIEW_ID_FILE"
     clear_preview
     refresh_badge 0
+    flock -u 9
+    exec 9>&-
 
     local selected msg
     selected="$(
@@ -109,7 +126,16 @@ cmd_ui() {
     fi
 }
 
+usage() {
+    cat <<'EOF'
+Usage: tmux-notify [push <message> | list | clear | ui | -h | --help]
+EOF
+}
+
 case "${1:-ui}" in
+    -h|--help)
+        usage
+        ;;
     push)
         shift
         cmd_push "$*"

@@ -15,3 +15,9 @@ Personal tmux, shell, Whisper dictation, and corner-notification dotfiles for Ar
 | [`bash_profile`](bash_profile) | `~/.bash_profile` | Login shell startup and deduplicated `PATH` env sourcing |
 
 See [docs/symlinks.md](docs/symlinks.md) for the full symlink creation and setup commands.
+
+## Alternate / Reference Configs
+
+- [`tmux.conf.omarchy`](tmux.conf.omarchy) — Standalone Omarchy-style tmux configuration
+- [`tmux.conf.local`](tmux.conf.local) — Legacy Oh My Tmux! configuration
+- [`bash_theme.sh`](bash_theme.sh) — Legacy bash prompt & CLI theme configuration

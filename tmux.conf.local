@@ -222,7 +222,7 @@ tmux_conf_theme_status_left=""
 
 tmux_conf_theme_status_right_fg="default"
 tmux_conf_theme_status_right_bg="default"
-tmux_conf_theme_status_right=' %H:%M:%S |  #[fg=red],#{pane_current_command} |  #{b:pane_current_path} | 󱫋 #P | 󰊢 #(cd #{pane_current_path}; git rev-parse --abbrev-ref HEAD 2>/dev/null)'
+tmux_conf_theme_status_right=' %H:%M:%S |  #[fg=red]#{pane_current_command} |  #{b:pane_current_path} | 󱫋 #P | 󰊢 #(git -C #{q:pane_current_path} rev-parse --abbrev-ref HEAD 2>/dev/null)'
 
 tmux_conf_theme_window_status_attr="bold"
 tmux_conf_theme_window_status_format=" #I"
@@ -480,7 +480,6 @@ set -g status-position top
 # /!\ the 'set -g @tpm_plugins' syntax is not supported
 # to enable a plugin, use the 'set -g @plugin' syntax:
 # visit https://github.com/tmux-plugins for available plugins
-set -g @plugin 'tmux-plugins/tmux-copycat'
 set -g @plugin 'tmux-plugins/tmux-cpu'
 set -g @plugin 'tmux-plugins/tmux-resurrect'
 set -g @plugin 'tmux-plugins/tmux-continuum'

@@ -92,11 +92,16 @@ transcribe_and_paste() {
     local target_pane="$2"
 
     set_status "#[fg=yellow]● #[default]"
-    local raw_text text
-    raw_text="$(whisper-cli -m "$MODEL_PATH" -f "$wav" -t "$(nproc)" --no-timestamps --no-prints 2>/dev/null || true)"
+    local raw_text text rc=0
+    raw_text="$(whisper-cli -m "$MODEL_PATH" -f "$wav" -t "$(nproc)" --no-timestamps --no-prints 2>/dev/null)" || rc=$?
     rm -f "$wav"
-    if [[ ! -f "$PID_FILE" ]]; then
+    if ! is_recording; then
         set_status ""
+    fi
+
+    if (( rc != 0 )); then
+        notify_msg "Whisper failed (exit $rc)"
+        return 1
     fi
 
     text="$(printf '%s' "$raw_text" | tr '\n' ' ' | sed -E -e 's/\[[^]]*\]//g' -e 's/^[[:space:]]+//' -e 's/[[:space:]]+$//' -e 's/  +/ /g')"
@@ -144,7 +149,8 @@ start_unlocked() {
 
     local target_pane tmp_wav rec_pid
     target_pane="$(resolve_pane "${1:-}")"
-    tmp_wav="$(mktemp --suffix=.wav)"
+    rm -f "$STATE_DIR"/rec.*.wav
+    tmp_wav="$(mktemp "$STATE_DIR/rec.XXXXXX.wav")"
 
     printf '%s' "$tmp_wav" >"$WAV_FILE"
     printf '%s' "$target_pane" >"$PANE_FILE"
@@ -228,16 +234,20 @@ cmd_toggle() {
         start_ms="$(cat "$START_MS_FILE" 2>/dev/null || echo 0)"
         elapsed_ms=$((now_ms - start_ms))
         if (( elapsed_ms < 600 )); then
+            flock -u 9 2>/dev/null || true
+            exec 9>&- 2>/dev/null || true
             return 0
         fi
         stop_unlocked "${1:-}"
     else
         start_unlocked "${1:-}"
+        flock -u 9 2>/dev/null || true
+        exec 9>&- 2>/dev/null || true
         return 0
     fi
 
-    flock -u 9
-    exec 9>&-
+    flock -u 9 2>/dev/null || true
+    exec 9>&- 2>/dev/null || true
     if [[ -n "$STOPPED_WAV" ]]; then
         check_deps || { rm -f "$STOPPED_WAV"; set_status ""; exit 1; }
         transcribe_and_paste "$STOPPED_WAV" "$STOPPED_PANE"
@@ -247,7 +257,7 @@ cmd_toggle() {
 cmd_popup() {
     local target_pane tmp_wav rec_pid=""
     target_pane="$(resolve_pane "${1:-}")"
-    tmp_wav="$(mktemp --suffix=.wav)"
+    tmp_wav="$(mktemp "$STATE_DIR/rec.XXXXXX.wav")"
 
     cleanup_popup() {
         if [[ -n "$rec_pid" ]] && kill -0 "$rec_pid" 2>/dev/null; then
@@ -280,6 +290,15 @@ cmd_popup() {
     echo "🎤 Recording... Press [Enter] to transcribe, or [Ctrl-C] to cancel."
     arecord -q -f S16_LE -r 16000 -c 1 "$tmp_wav" &
     rec_pid=$!
+    sleep 0.15
+    if ! kill -0 "$rec_pid" 2>/dev/null; then
+        wait "$rec_pid" 2>/dev/null || true
+        rec_pid=""
+        echo "Error: arecord exited unexpectedly (check audio / PulseAudio)."
+        notify_msg "Whisper error: arecord failed"
+        read -r -n 1 -s -p "Press any key to close..." || true
+        exit 1
+    fi
 
     IFS= read -r _
     sleep 0.2
