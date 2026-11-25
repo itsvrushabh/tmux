@@ -57,7 +57,7 @@ cmd_push() {
     preview_id="$(date +%s%N)"
     printf '%s' "$preview_id" >"$PREVIEW_ID_FILE"
 
-    tmux set -g @notify_preview ": $preview_text" 2>/dev/null || true
+    tmux set -g @notify_preview "$preview_text" 2>/dev/null || true
     refresh_badge "$count"
 
     flock -u 9
