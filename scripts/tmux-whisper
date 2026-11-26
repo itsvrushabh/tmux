@@ -6,7 +6,11 @@ MODEL_NAME="${WHISPER_MODEL:-ggml-small.en.bin}"
 MODEL_PATH="$MODEL_DIR/$MODEL_NAME"
 MODEL_URL="https://huggingface.co/ggerganov/whisper.cpp/resolve/main/$MODEL_NAME"
 
-STATE_DIR="${XDG_RUNTIME_DIR:-/tmp}/tmux-whisper"
+if [[ -n "${XDG_RUNTIME_DIR:-}" && -w "$XDG_RUNTIME_DIR" ]]; then
+    STATE_DIR="$XDG_RUNTIME_DIR/tmux-whisper"
+else
+    STATE_DIR="/tmp/tmux-whisper-${USER:-$(id -u)}"
+fi
 LOCK_FILE="$STATE_DIR/lock"
 MODEL_LOCK_FILE="$STATE_DIR/model.lock"
 PID_FILE="$STATE_DIR/pid"
@@ -26,6 +30,13 @@ notify_msg() {
         "$HOME/.local/bin/tmux-notify" push "$1" 2>/dev/null || true
     fi
 }
+
+on_error() {
+    local rc=$1 line=$2
+    set_status ""
+    notify_msg "ERR: tmux-whisper failed (exit $rc, line $line)"
+}
+trap 'on_error $? $LINENO' ERR
 
 is_recording() {
     local pid
@@ -288,14 +299,15 @@ cmd_popup() {
     fi
 
     clear
-    echo "🎤 Recording... Press [Enter] to transcribe, or [Ctrl-C] to cancel."
+    printf '\e[38;2;0;255;135m◈ \e[1;38;2;0;215;255mWHISPER VOICE\e[0m \e[38;2;106;106;138m─\e[0m \e[38;2;255;95;95m● REC\e[0m\n'
+    printf '\e[38;2;106;106;138mPress \e[38;2;255;175;0m[Enter]\e[38;2;106;106;138m to transcribe, or \e[38;2;255;95;95m[Ctrl-C]\e[38;2;106;106;138m to cancel.\e[0m\n'
     arecord -q -f S16_LE -r 16000 -c 1 "$tmp_wav" &
     rec_pid=$!
     sleep 0.15
     if ! kill -0 "$rec_pid" 2>/dev/null; then
         wait "$rec_pid" 2>/dev/null || true
         rec_pid=""
-        echo "Error: arecord exited unexpectedly (check audio / PulseAudio)."
+        printf '\e[38;2;255;95;95m✖ Error: arecord exited unexpectedly (check audio / PulseAudio).\e[0m\n'
         notify_msg "Whisper error: arecord failed"
         read -r -n 1 -s -p "Press any key to close..." || true
         exit 1
@@ -307,7 +319,7 @@ cmd_popup() {
     wait "$rec_pid" 2>/dev/null || true
     rec_pid=""
 
-    echo "⏳ Transcribing..."
+    printf '\e[38;2;175;95;255m⚡ Transcribing...\e[0m\n'
     transcribe_and_paste "$tmp_wav" "$target_pane"
 }
 

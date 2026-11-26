@@ -109,10 +109,13 @@ cmd_ui() {
             --no-sort \
             --layout=reverse \
             --border=none \
-            --prompt='󰂚 ' \
-            --header='Enter: copy | Ctrl-x: clear | Esc: close' \
+            --prompt='⚡ ' \
+            --pointer='◈' \
+            --header='Enter: copy | Ctrl-a: fix with agy | Ctrl-x: clear | Esc: close' \
+            --color='bg:#0d0d0d,bg+:#1a1a2e,fg:#6a6a8a,fg+:#00d7ff,hl:#ffaf00,hl+:#ffaf00,info:#af5fff,prompt:#00ff87,pointer:#00d7ff,marker:#00ff87,border:#6a6a8a,header:#af5fff,preview-bg:#0d0d0d,preview-fg:#00d7ff' \
             --preview='printf "%s\n" {}' \
             --preview-window='down:4:wrap:border-top' \
+            --bind "ctrl-a:execute-silent(\"$HOME/.local/bin/tmux-notify\" fix {})+abort" \
             --bind "ctrl-x:execute-silent(\"$HOME/.local/bin/tmux-notify\" clear)+reload(\"$HOME/.local/bin/tmux-notify\" list)" \
             || true
     )"
@@ -126,9 +129,17 @@ cmd_ui() {
     fi
 }
 
+cmd_fix() {
+    local msg="${*:-}"
+    [[ -z "$msg" || "$msg" == "(No notifications)" ]] && return 0
+    msg="${msg#\[*\] }"
+    mkdir -p "$HOME/Work/error"
+    tmux split-window -h -c "$HOME/Work/error" "agy -i $(printf '%q' "Rectify this error: $msg"); exec bash"
+}
+
 usage() {
     cat <<'EOF'
-Usage: tmux-notify [push <message> | list | clear | ui | -h | --help]
+Usage: tmux-notify [push <message> | list | clear | fix <line> | ui | -h | --help]
 EOF
 }
 
@@ -145,6 +156,10 @@ case "${1:-ui}" in
         ;;
     clear)
         cmd_clear
+        ;;
+    fix)
+        shift
+        cmd_fix "$*"
         ;;
     ui)
         cmd_ui
