@@ -153,3 +153,8 @@ fi
 
 # Final PS1 (prompt_status evaluates the exit status dynamically)
 export PS1="\$(prompt_status \$?) ${Cyan}\w\$(parse_git_branch)${Reset} "
+
+_sync_tmux_bash_theme() {
+    [ -f "$HOME/.cache/tmux-theme.sh" ] && . "$HOME/.cache/tmux-theme.sh"
+}
+PROMPT_COMMAND="_sync_tmux_bash_theme${PROMPT_COMMAND:+; $PROMPT_COMMAND}"
