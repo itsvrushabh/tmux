@@ -1,0 +1,13 @@
+show = [
+    "Host",
+    "Kernel",
+    "Distribution",
+    "Terminal",
+    "Shell",
+    "Packages",
+    "Uptime",
+    "Processor",
+    "ProcessorLoad",
+    "Memory",
+    "DiskSpace",
+]
