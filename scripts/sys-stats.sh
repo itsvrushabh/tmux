@@ -153,6 +153,42 @@ format_net() {
         "$icon_color" "$COLOR_TEXT" "$(format_rate "$rx_bps")" "$(format_rate "$tx_bps")"
 }
 
+# ── Battery Status (%) ────────────────────────────────────────────────
+get_battery() {
+    local bat
+    for bat in /sys/class/power_supply/BAT*; do
+        [ -d "$bat" ] || continue
+        local cap_file="${bat}/capacity"
+        local stat_file="${bat}/status"
+        [ -r "$cap_file" ] || continue
+        local cap status="Unknown"
+        read -r cap < "$cap_file"
+        [ -r "$stat_file" ] && read -r status < "$stat_file"
+        if [[ "$cap" =~ ^[0-9]+$ ]]; then
+            echo "$cap $status"
+            return 0
+        fi
+    done
+    return 1
+}
+
+format_battery() {
+    local cap="$1"
+    local status="$2"
+    local icon="󰁹"
+    local icon_color="$COLOR_NORMAL"
+
+    if [ "$status" = "Charging" ]; then
+        icon="󰂄"
+        icon_color="#00ff87"
+    elif [ "$cap" -le 20 ] 2>/dev/null; then
+        icon="󰂃"
+        icon_color="$COLOR_HEAVY"
+    fi
+
+    printf "#[fg=%s]%s #[fg=%s]%s%%" "$icon_color" "$icon" "$COLOR_TEXT" "$cap"
+}
+
 cpu_pct=$(get_cpu)
 ram_pct=$(get_ram)
 read -r net_rx_bps net_tx_bps <<< "$(get_net)"
@@ -164,5 +200,10 @@ if gpu_pct=$(get_gpu); then
 fi
 
 out="$out $(format_net "$net_rx_bps" "$net_tx_bps")"
+
+if bat_info=$(get_battery); then
+    read -r bat_cap bat_status <<< "$bat_info"
+    out="$out $(format_battery "$bat_cap" "$bat_status")"
+fi
 
 printf "%s" "$out"
