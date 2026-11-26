@@ -145,7 +145,7 @@ command -v fzf >/dev/null 2>&1 && eval "$(fzf --bash)"
 # Auto-start tmux
 if [ -z "$TMUX" ] && [ -z "$NVIM" ] && [ "$TERM_PROGRAM" != "vscode" ]; then
     if command -v tmux >/dev/null 2>&1; then
-        exec tmux new-session -A -s default
+        exec tmux new-session -A -s main
     fi
 fi
 

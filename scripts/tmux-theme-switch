@@ -4,14 +4,18 @@ set -euo pipefail
 THEMES=(cyberpunk tokyo-night catppuccin-mocha gruvbox-dark nord)
 
 current="$(tmux show-option -gqv @tmux_theme || true)"
-next_idx=0
-for i in "${!THEMES[@]}"; do
-  if [[ "${THEMES[$i]}" == "$current" ]]; then
-    next_idx=$(( (i + 1) % ${#THEMES[@]} ))
-    break
-  fi
-done
-theme="${THEMES[$next_idx]}"
+if [[ "${1:-}" == "apply" ]]; then
+  theme="${current:-${THEMES[0]}}"
+else
+  next_idx=0
+  for i in "${!THEMES[@]}"; do
+    if [[ "${THEMES[$i]}" == "$current" ]]; then
+      next_idx=$(( (i + 1) % ${#THEMES[@]} ))
+      break
+    fi
+  done
+  theme="${THEMES[$next_idx]}"
+fi
 
 case "$theme" in
   cyberpunk)
@@ -64,7 +68,9 @@ tmux set -g mode-style "bg=${bg_alt},fg=${accent},bold"
 tmux set -g status-style "bg=${bg},fg=${dim}"
 tmux set -g window-status-format "#[fg=${dim}][#I]"
 tmux set -g window-status-current-format "#[fg=${dim}][#{?client_prefix,#[fg=${err}]⌨ ,#[fg=${accent}]⚡}#[fg=${fg},bold]#[fg=${dim},nobold]#[fg=${fg},bold]#[fg=${dim},nobold]]"
-tmux set -g status-right "#(/home/wsluser/Work/tmux/scripts/sys-stats.sh) #[fg=${dim}][#[fg=${fg},bold]%H:%M#[fg=${dim},nobold]] #[fg=${dim}]◈ #P "
+tmux set -g status-right "#($HOME/.local/bin/sys-stats.sh) #[fg=${dim}][#[fg=${fg},bold]%H:%M#[fg=${dim},nobold]] #[fg=${dim}]◈ #P "
 tmux set -g "status-format[0]" "#[align=left]#{T:status-left}#{W:#{E:window-status-format}#{T:window-status-separator},#{E:window-status-current-format}#{T:window-status-separator}}#[align=centre]#{?#{||:#{@notify_count},#{@whisper_status}},#[fg=${bg_alt}]#[bg=${bg}]#[bg=${bg_alt}] #{@whisper_status}#{?#{@notify_count},#[fg=${warn}]#[bold]󰂚 #{@notify_count}#[nobold]#{?#{@notify_preview}, #[fg=${fg}]#{@notify_preview},},} #[fg=${bg_alt}]#[bg=${bg}],#[fg=${bg_alt}]#[bg=${bg}]#[bg=${bg_alt}]#[fg=${dim}] ◈ #[fg=${bg_alt}]#[bg=${bg}]}#[align=right]#{T:status-right}"
 
-tmux display-message "Theme: ${theme}"
+if [[ "${1:-}" != "apply" ]]; then
+  tmux display-message "Theme: ${theme}"
+fi

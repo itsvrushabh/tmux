@@ -37,3 +37,7 @@ if [ -z "$TMUX" ] && [ -z "$NVIM" ] && [ "$TERM_PROGRAM" != "vscode" ]; then
         exec tmux new-session -A -s main
     fi
 fi
+
+# Added by GitButler installer
+export PATH="$HOME/.local/bin:$PATH"
+command -v but >/dev/null 2>&1 && eval "$(but completions bash)"

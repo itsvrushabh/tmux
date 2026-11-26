@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
+set -euo pipefail
 # System utilization stats for tmux status bar: CPU, RAM, GPU (NVIDIA/AMD), Network.
 # Outputs tmux-formatted string with Nerd Font icons and % utilization.
 # Heavy utilization (>= THRESHOLD%) turns the icon red (#ff5f5f).
 
+if [[ -n "${XDG_RUNTIME_DIR:-}" && -w "$XDG_RUNTIME_DIR" ]]; then
+    STATE_DIR="$XDG_RUNTIME_DIR/tmux-sys-stats"
+else
+    STATE_DIR="/tmp/tmux-sys-stats-${USER:-$(id -u)}"
+fi
+mkdir -p "$STATE_DIR"
+
 THRESHOLD=80
-COLOR_NORMAL="#00d7ff"
-COLOR_HEAVY="#ff5f5f"
-COLOR_TEXT="#6a6a8a"
+case "$(tmux show-option -gqv @tmux_theme 2>/dev/null || true)" in
+    tokyo-night)      COLOR_NORMAL="#7aa2f7"; COLOR_HEAVY="#f7768e"; COLOR_TEXT="#565f89" ;;
+    catppuccin-mocha) COLOR_NORMAL="#89b4fa"; COLOR_HEAVY="#f38ba8"; COLOR_TEXT="#6c7086" ;;
+    gruvbox-dark)     COLOR_NORMAL="#83a598"; COLOR_HEAVY="#fb4934"; COLOR_TEXT="#928374" ;;
+    nord)             COLOR_NORMAL="#88c0d0"; COLOR_HEAVY="#bf616a"; COLOR_TEXT="#616e88" ;;
+    *)                COLOR_NORMAL="#00d7ff"; COLOR_HEAVY="#ff5f5f"; COLOR_TEXT="#6a6a8a" ;;
+esac
 
 format_stat() {
     local icon="$1"
@@ -22,7 +34,7 @@ format_stat() {
 
 # ── CPU Utilization (%) ───────────────────────────────────────────────
 get_cpu() {
-    local cache="/tmp/tmux-cpu-stat"
+    local cache="$STATE_DIR/cpu-stat"
     local cpu_line
     read -r cpu_line < /proc/stat
     # cpu user nice system idle iowait irq softirq steal
@@ -109,7 +121,7 @@ get_net() {
     read -r tx < "$tx_file"
     now=$(date +%s)
 
-    local cache="/tmp/tmux-net-stat-${iface}"
+    local cache="$STATE_DIR/net-stat-${iface}"
     local rx_bps=0 tx_bps=0
 
     if [ -f "$cache" ]; then

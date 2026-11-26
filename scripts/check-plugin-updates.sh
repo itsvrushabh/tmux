@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$SCRIPT_DIR/.."
+
 LOCK_FILE="plugins.lock.json"
 SUMMARY_FILE="plugin_updates_summary.md"
 TMUX_CONF="tmux.conf"
@@ -11,7 +14,7 @@ if [ ! -f "$TMUX_CONF" ]; then
 fi
 
 echo "Scanning $TMUX_CONF for plugins..."
-plugins=$(grep -E "^[[:space:]]*set -g @plugin " "$TMUX_CONF" | awk '{print $4}' | tr -d "'\"")
+plugins=$(grep -E "^[[:space:]]*set(-option)?[[:space:]]+-g[[:space:]]+@plugin[[:space:]]+" "$TMUX_CONF" | sed -E "s/.*@plugin[[:space:]]+['\"]?([^'\"]+)['\"]?.*/\1/")
 
 # Load existing lockfile or initialize empty JSON
 if [ -f "$LOCK_FILE" ]; then
@@ -40,7 +43,7 @@ while IFS= read -r plugin; do
         auth_header=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
     fi
 
-    commit_res=$(curl -sSL "${auth_header[@]}" "$api_url" || echo "{}")
+    commit_res=$(curl -fsSL "${auth_header[@]}" "$api_url" 2>/dev/null || echo "{}")
     latest_sha=$(echo "$commit_res" | jq -r '.sha // empty' 2>/dev/null || true)
     
     if [ -z "$latest_sha" ]; then
@@ -51,7 +54,7 @@ while IFS= read -r plugin; do
     short_sha="${latest_sha:0:7}"
 
     # Fetch latest release/tag if available
-    tag_res=$(curl -sSL "${auth_header[@]}" "https://api.github.com/repos/${repo}/releases/latest" || echo "{}")
+    tag_res=$(curl -fsSL "${auth_header[@]}" "https://api.github.com/repos/${repo}/releases/latest" 2>/dev/null || echo "{}")
     latest_tag=$(echo "$tag_res" | jq -r '.tag_name // "HEAD"' 2>/dev/null || echo "HEAD")
 
     # Read previous recorded SHA
@@ -74,14 +77,15 @@ while IFS= read -r plugin; do
 done <<< "$plugins"
 
 # Prune plugins removed from tmux.conf
-for existing_plugin in $(echo "$lock_data" | jq -r 'keys[]'); do
+while IFS= read -r existing_plugin; do
+    [[ -z "$existing_plugin" ]] && continue
     if ! printf '%s\n' "$plugins" | grep -Fxq "$existing_plugin"; then
         echo "Removing unused plugin from lockfile: $existing_plugin"
         new_lock_data=$(echo "$new_lock_data" | jq --arg p "$existing_plugin" 'del(.[$p])')
         echo "| $existing_plugin | (removed) | - | - |" >> "$SUMMARY_FILE"
         updated=1
     fi
-done
+done < <(echo "$lock_data" | jq -r 'keys[]')
 
 echo "$new_lock_data" | jq '.' > "$LOCK_FILE"
 
