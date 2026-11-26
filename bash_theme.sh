@@ -66,19 +66,6 @@ parse_git_branch() {
      echo -e " ($branch$marks)"
 }
 
-# The enhanced function (from above)
-# parse_git_branch() {
-#      if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-#           local status="$(git status --porcelain 2>/dev/null)"
-#           local branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
-#           local marks=""
-#           [[ "$status" =~ [[:space:]][MADRCU] ]] && marks+=" ✚"
-#           [[ "$status" =~ ^[MADRCU] ]] && marks+=" ●"
-#           [[ "$status" =~ \?\? ]] && marks+=" …"
-#           [[ $(git status -sb 2>/dev/null) =~ ahead ]] && marks+=" ↑"
-#           echo -e " \[\e[0;35m\]( \[\e[0;33m\]$branch$marks \[\e[0;35m\])"
-#      fi
-# }
 
 # Define Icons (You can replace these with any emoji or symbol)
 SuccessIcon="✔"

@@ -1,0 +1,48 @@
+# Cyberpunk / Sci-Fi Starship config (matches tmux.conf palette)
+# Palette: cyan #00d7ff | emerald #00ff87 | purple #af5fff | amber #ffaf00 | charcoal #1a1a2e
+
+add_newline = true
+
+format = """
+[┌─](fg:#6a6a8a)\
+$os\
+$directory\
+$git_branch\
+$git_status\
+$cmd_duration\
+$line_break\
+[└─](fg:#6a6a8a)$character"""
+
+[os]
+disabled = false
+format = "[$symbol](fg:#00ff87) "
+
+[os.symbols]
+Arch = "󰣇"
+Ubuntu = "󰕈"
+Linux = "󰌽"
+
+[directory]
+style = "bold fg:#00d7ff"
+format = "[\\[](fg:#6a6a8a)[$path]($style)[\\]](fg:#6a6a8a) "
+truncation_length = 3
+truncation_symbol = "…/"
+
+[git_branch]
+symbol = "󰊢 "
+style = "fg:#af5fff"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "fg:#ffaf00"
+format = '([\[$all_status$ahead_behind\]]($style) )'
+
+[cmd_duration]
+min_time = 2000
+style = "fg:#ffaf00"
+format = "[󱦟 $duration]($style) "
+
+[character]
+success_symbol = "[⚡](bold fg:#00ff87)"
+error_symbol = "[✖](bold fg:#ff5f5f)"
+vimcmd_symbol = "[◈](bold fg:#00d7ff)"

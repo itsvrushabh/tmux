@@ -28,7 +28,8 @@ echo "| :--- | :--- | :--- | :--- |" >> "$SUMMARY_FILE"
 
 new_lock_data="$lock_data"
 
-for plugin in $plugins; do
+while IFS= read -r plugin; do
+    [[ -z "$plugin" ]] && continue
     repo="${plugin%%#*}"
     echo "Checking $plugin..."
     
@@ -70,7 +71,7 @@ for plugin in $plugins; do
     else
         echo "$plugin is up to date ($short_sha)."
     fi
-done
+done <<< "$plugins"
 
 # Prune plugins removed from tmux.conf
 for existing_plugin in $(echo "$lock_data" | jq -r 'keys[]'); do
