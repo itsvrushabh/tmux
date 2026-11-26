@@ -23,6 +23,18 @@ macros:
       - display "#{log_info} Restarting pane"
       - 'respawnp -k -c #{pane_current_path}'
 items:
+  - name: System Monitor (btm)
+    key: B
+    command: 'display-popup -E -b rounded -w 90% -h 85% -T "  System Monitor (btm) " "btm"'
+  - name: System Summary (macchina)
+    key: M
+    command: 'display-popup -E -b rounded -w 60% -h 55% -T " 󰍹 System Summary (macchina) " "bash -c '\''macchina; echo; read -n 1 -s -r -p \"Press any key to close...\"'\''"'
+  - name: Speed Test (cfspeedtest)
+    key: S
+    command: 'display-popup -E -b rounded -w 60% -h 55% -T " 󰛳 Speed Test (cfspeedtest) " "bash -c '\''cfspeedtest; echo; read -n 1 -s -r -p \"Press any key to close...\"'\''"'
+  - name: Open ~/work/error (agy)
+    key: E
+    command: 'new-window -c "$HOME/work/error" "bash -lic '\''mkdir -p \"$HOME/work/error\" && cd \"$HOME/work/error\" && agy .'\''"'
   - name: Run
     key: space
     command: command-prompt
